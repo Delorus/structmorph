@@ -1,6 +1,6 @@
 package main
 
-//go:generate structmorph --from=main.Person --to=main.PersonDTO
+//go:generate go run ../cmd/structmorph/structmorph.go --from=main.Person --to=main.PersonDTO
 type Person struct {
 	Name string
 	Age  int

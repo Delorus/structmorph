@@ -1,6 +1,6 @@
 package main
 
-//go:generate structmorph --from=domain.Organization --to=main.OrganizationDTO
+//go:generate go run ../cmd/structmorph/structmorph.go --from=domain.Organization --to=main.OrganizationDTO
 type OrganizationDTO struct {
 	Title       string
 	Description string
