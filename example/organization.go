@@ -5,4 +5,5 @@ type OrganizationDTO struct {
 	Title       string
 	Description string
 	Priority    float64
+	TeamSize    int `morph:"EmployeesCount"`
 }

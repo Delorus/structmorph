@@ -22,14 +22,14 @@ package {{.ToPkg}}
 
 func {{.FuncNameToDTO}}(src {{if ne .FromPkg "main"}}{{.FromPkg}}.{{end}}{{.From}}) {{.To}} {
 	return {{.To}}{
-		{{range .Fields}}{{.ToField}}: src.{{.FromField}},
+		{{range .Fields}}{{.ToField.Name}}: src.{{.FromField}},
 		{{end}}
 	}
 }
 
 func {{.FuncNameToStruct}}(src {{.To}}) {{if ne .FromPkg "main"}}{{.FromPkg}}.{{end}}{{.From}} {
 	return {{if ne .FromPkg "main"}}{{.FromPkg}}.{{end}}{{.From}}{
-		{{range .Fields}}{{.FromField}}: src.{{.ToField}},
+		{{range .Fields}}{{.FromField}}: src.{{.ToField.Name}},
 		{{end}}
 	}
 }
@@ -45,13 +45,13 @@ func Generate(from, to string) error {
 		return err
 	}
 
-	fromStruct, err := FindAndParseStruct(fromStructName)
+	fromStruct, err := FindAndParseStructFrom(fromStructName)
 	if err != nil {
 		return err
 	}
 	slog.Info("Found and parsed struct", slog.Any("struct", fromStruct))
 
-	toStruct, err := FindAndParseStruct(toStructName)
+	toStruct, err := FindAndParseStructTo(toStructName)
 	if err != nil {
 		return err
 	}
@@ -117,20 +117,42 @@ func ParseStructName(rawName string) (StructName, error) {
 	}, nil
 }
 
-type StructType struct {
+type ToStructType struct {
+	StructName
+	Fields []ToFieldType
+}
+
+type FromStructType struct {
 	StructName
 	ImportPath string
 	Fields     map[string]string
 }
 
-func FindAndParseStruct(name StructName) (s StructType, err error) {
+func FindAndParseStructTo(name StructName) (ToStructType, error) {
+	result := &ToStructType{StructName: name}
+	return *result, findStruct(name, func(name StructName, pkg *packages.Package, spec *ast.TypeSpec) {
+		result.extractFields(spec)
+	})
+}
+
+func FindAndParseStructFrom(name StructName) (FromStructType, error) {
+	result := &FromStructType{StructName: name}
+	return *result, findStruct(name, func(name StructName, pkg *packages.Package, spec *ast.TypeSpec) {
+		result.ImportPath = pkg.PkgPath
+		result.extractFields(spec)
+	})
+}
+
+type parseStructTypeFunc func(name StructName, pkg *packages.Package, spec *ast.TypeSpec)
+
+func findStruct(name StructName, parser parseStructTypeFunc) error {
 	cfg := &packages.Config{
 		//todo убрать потом то что не нужно
 		Mode: packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedCompiledGoFiles | packages.NeedDeps | packages.NeedImports,
 	}
 	pkgs, err := packages.Load(cfg, "./...")
 	if err != nil {
-		return StructType{}, fmt.Errorf("error loading packages: %w", err)
+		return fmt.Errorf("error loading packages: %w", err)
 	}
 
 	var found bool
@@ -142,9 +164,9 @@ func FindAndParseStruct(name StructName) (s StructType, err error) {
 					for _, spec := range node.Specs {
 						if t, ok := spec.(*ast.TypeSpec); ok && t.Name.Name == name.Name {
 							filePath := pkg.Fset.Position(file.Pos()).Filename
-							s = parseStructType(name, pkg, t)
+							parser(name, pkg, t)
 							found = true
-							slog.Info("Struct found in file", "struct", s.Name, "file", filePath, "importPath", pkg.PkgPath, "fields", s.Fields)
+							slog.Info("Struct found in file", "struct", name, "file", filePath, "importPath", pkg.PkgPath)
 							return false
 						}
 					}
@@ -155,47 +177,75 @@ func FindAndParseStruct(name StructName) (s StructType, err error) {
 	}
 
 	if !found {
-		return s, fmt.Errorf("struct not found")
+		return fmt.Errorf("struct not found")
 	}
 
-	return
+	return nil
 }
 
-func parseStructType(name StructName, pkg *packages.Package, spec *ast.TypeSpec) StructType {
-	s := StructType{
-		StructName: name,
-	}
-	s.ImportPath = pkg.PkgPath
-	s.Fields = extractFields(spec)
-
-	return s
-}
-
-func extractFields(t *ast.TypeSpec) map[string]string {
-	fields := map[string]string{}
-	for _, field := range t.Type.(*ast.StructType).Fields.List {
+func (t *FromStructType) extractFields(spec *ast.TypeSpec) {
+	list := spec.Type.(*ast.StructType).Fields.List
+	fields := make(map[string]string, len(list))
+	for _, field := range list {
 		fieldName := field.Names[0].Name
 		fieldType := fmt.Sprintf("%s", field.Type)
 		fields[fieldName] = fieldType
 	}
-	return fields
+	t.Fields = fields
+}
+
+type ToFieldType struct {
+	Name      string
+	Type      string
+	FromField string
+}
+
+func (s *ToStructType) extractFields(t *ast.TypeSpec) {
+	list := t.Type.(*ast.StructType).Fields.List
+	fields := make([]ToFieldType, 0, len(list))
+	for _, field := range list {
+		fieldName := field.Names[0].Name
+		fieldType := ToFieldType{
+			Name:      fieldName,
+			Type:      fmt.Sprintf("%s", field.Type),
+			FromField: fieldName,
+		}
+
+		if field.Tag != nil {
+			tag := field.Tag.Value
+			if strings.HasPrefix(tag, "`morph:") {
+				tagValue := strings.Trim(tag, "`")
+				tagValue = strings.TrimPrefix(tagValue, "morph:\"")
+				tagValue = strings.TrimSuffix(tagValue, "\"")
+				fieldType.FromField = tagValue
+			}
+		}
+
+		//}
+		//for _, tag := range field.Names[0].Obj.Decl.(*ast.Field).Tag.Value {
+		// find tag starts with `morph:"`
+		fields = append(fields, fieldType)
+	}
+
+	s.Fields = fields
 }
 
 type FieldMapping struct {
 	FromField string
-	ToField   string
+	ToField   ToFieldType
 }
 
-func CreateMapping(fromStruct, toStruct StructType) ([]FieldMapping, error) {
+func CreateMapping(fromStruct FromStructType, toStruct ToStructType) ([]FieldMapping, error) {
 	var fields []FieldMapping
-	for fieldName, fieldType := range toStruct.Fields {
-		fromFieldType, ok := fromStruct.Fields[fieldName]
-		if !ok || fromFieldType != fieldType {
-			return nil, fmt.Errorf("field not found or type mismatch, field: %s, type: %s, struct: %s", fieldName, fieldType, fromStruct.Name)
+	for _, toField := range toStruct.Fields {
+		fromField := toField.FromField
+		fromFieldType, ok := fromStruct.Fields[fromField]
+		if !ok || fromFieldType != toField.Type {
+			return nil, fmt.Errorf("field not found or type mismatch, field: %s, type: %+v, struct: %s", fromField, toField, fromStruct.Name)
 		}
 		fields = append(fields, FieldMapping{
-			FromField: fieldName,
-			ToField:   fieldName,
+			FromField: fromField,
+			ToField:   toField,
 		})
 	}
 
@@ -206,7 +256,9 @@ func FormatAndWrite(buff *bytes.Buffer, fileName string) error {
 	// Run goimports on the generated file
 	formattedSource, err := imports.Process(fileName, buff.Bytes(), nil)
 	if err != nil {
-		return fmt.Errorf("error running goimports on generated file: %w", err)
+		slog.Error("Error running goimports on generated file", "error", err)
+		// Write the unformatted source to the file anyway, so the user can see what went wrong
+		formattedSource = buff.Bytes()
 	}
 
 	// Write the formatted source back to the file
@@ -239,6 +291,6 @@ func (data TemplateData) GenerateCode(output io.Writer) error {
 	return nil
 }
 
-func (s StructType) FileName() string {
-	return fmt.Sprintf("morph_%s.go", strings.ToLower(s.Name))
+func (t FromStructType) FileName() string {
+	return fmt.Sprintf("morph_%s.go", strings.ToLower(t.Name))
 }
