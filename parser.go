@@ -91,8 +91,14 @@ func (t *FromStructType) extractFields(spec *ast.TypeSpec) {
 	list := spec.Type.(*ast.StructType).Fields.List
 	fields := make(map[string]string, len(list))
 	for _, field := range list {
-		fieldName := field.Names[0].Name
-		fieldType := fmt.Sprintf("%s", field.Type)
+		fieldType := parseFieldType(field.Type)
+
+		fieldName := fieldType
+		// handle anonymous struct fields
+		if len(field.Names) > 0 {
+			fieldName = field.Names[0].Name
+		}
+
 		fields[fieldName] = fieldType
 	}
 	t.Fields = fields
@@ -101,29 +107,53 @@ func (t *FromStructType) extractFields(spec *ast.TypeSpec) {
 func (s *ToStructType) extractFields(t *ast.TypeSpec) {
 	list := t.Type.(*ast.StructType).Fields.List
 	fields := make([]ToFieldType, 0, len(list))
-	for _, field := range list {
-		fieldName := field.Names[0].Name
-		fieldType := ToFieldType{
+	for _, astField := range list {
+		fieldType := parseFieldType(astField.Type)
+
+		fieldName := fieldType
+		// handle anonymous struct fields
+		if len(astField.Names) > 0 {
+			fieldName = astField.Names[0].Name
+		}
+
+		field := ToFieldType{
 			Name:      fieldName,
-			Type:      fmt.Sprintf("%s", field.Type),
+			Type:      fieldType,
 			FromField: fieldName,
 		}
 
-		if field.Tag != nil {
-			tag := field.Tag.Value
+		if astField.Tag != nil {
+			tag := astField.Tag.Value
 			if strings.HasPrefix(tag, "`morph:") {
 				tagValue := strings.Trim(tag, "`")
 				tagValue = strings.TrimPrefix(tagValue, "morph:\"")
 				tagValue = strings.TrimSuffix(tagValue, "\"")
-				fieldType.FromField = tagValue
+				field.FromField = tagValue
 			}
 		}
 
 		//}
-		//for _, tag := range field.Names[0].Obj.Decl.(*ast.Field).Tag.Value {
+		//for _, tag := range astField.Names[0].Obj.Decl.(*ast.Field).Tag.Value {
 		// find tag starts with `morph:"`
-		fields = append(fields, fieldType)
+		fields = append(fields, field)
 	}
 
 	s.Fields = fields
+}
+
+func parseFieldType(field ast.Expr) string {
+	switch t := field.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.ArrayType:
+		return fmt.Sprintf("[]%s", parseFieldType(t.Elt)) //todo limit
+	case *ast.MapType:
+		return fmt.Sprintf("map[%s]%s", parseFieldType(t.Key), parseFieldType(t.Value))
+	case *ast.StarExpr:
+		return fmt.Sprintf("*%s", parseFieldType(t.X))
+	//case *ast.SelectorExpr:
+	//	return fmt.Sprintf("%s.%s", t.X, t.Sel)
+	default:
+		return fmt.Sprintf("%T", t)
+	}
 }

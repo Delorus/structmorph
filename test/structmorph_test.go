@@ -2,19 +2,21 @@ package structmorph__test
 
 import (
 	"structmorph"
+	"structmorph/test/testdata/allsupportedtypes"
 	"structmorph/test/testdata/customfieldname"
 	"structmorph/test/testdata/partialfields"
 	"testing"
 
 	"github.com/go-faker/faker/v4"
+	"github.com/go-faker/faker/v4/pkg/options"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateManual(t *testing.T) {
-	t.Skip("Skip manual test")
+	//t.Skip("Skip manual test")
 	// you can generate in manual mode for debug purposes
-	err := structmorph.Generate("second.Person", "first.PersonDTO", structmorph.WithProjectRoot("testdata/differentpkg"))
+	err := structmorph.Generate("allsupportedtypes.Type", "allsupportedtypes.TypeDTO", structmorph.WithProjectRoot("testdata/allsupportedtypes"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -56,4 +58,19 @@ func TestGenerate__customfieldname(t *testing.T) {
 	assert.Equal(t, org.Description, convertedOrg.Description)
 	assert.Equal(t, org.Priority, convertedOrg.Priority)
 	assert.Equal(t, org.EmployeesCount, convertedOrg.EmployeesCount)
+}
+
+func TestGenerate__allsupportedtypes(t *testing.T) {
+	// Setup
+	tp := allsupportedtypes.Type{}
+	err := faker.FakeData(&tp, options.WithFieldsToIgnore("InterfaceField"))
+	require.NoError(t, err)
+	tp.InterfaceField = faker.Word()
+
+	// When
+	tpDTO := allsupportedtypes.ConvertToTypeDTO(tp)
+	convertedType := allsupportedtypes.ConvertToType(tpDTO)
+
+	// Then
+	assert.Equal(t, tp, convertedType)
 }
