@@ -2,6 +2,7 @@ package structmorph__test
 
 import (
 	"structmorph"
+	"structmorph/test/testdata/customfieldname"
 	"structmorph/test/testdata/partialfields"
 	"testing"
 
@@ -33,4 +34,26 @@ func TestGenerate__partialFields(t *testing.T) {
 	assert.Equal(t, person.Name, convertedPerson.Name)
 	assert.Equal(t, person.Age, convertedPerson.Age)
 	assert.Empty(t, convertedPerson.Sex)
+}
+
+func TestGenerate__customfieldname(t *testing.T) {
+	// Setup
+	org := customfieldname.Organization{}
+	err := faker.FakeData(&org)
+	require.NoError(t, err)
+
+	// When
+	orgDTO := customfieldname.ConvertToOrganizationDTO(org)
+	convertedOrg := customfieldname.ConvertToOrganization(orgDTO)
+
+	// Then
+	assert.Equal(t, org.Title, orgDTO.Title)
+	assert.Equal(t, org.Description, orgDTO.Description)
+	assert.Equal(t, org.Priority, orgDTO.Priority)
+	assert.Equal(t, org.EmployeesCount, orgDTO.TeamSize)
+
+	assert.Equal(t, org.Title, convertedOrg.Title)
+	assert.Equal(t, org.Description, convertedOrg.Description)
+	assert.Equal(t, org.Priority, convertedOrg.Priority)
+	assert.Equal(t, org.EmployeesCount, convertedOrg.EmployeesCount)
 }
