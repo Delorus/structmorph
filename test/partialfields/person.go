@@ -6,7 +6,7 @@ type Person struct {
 	Age  int
 }
 
-//go:generate go run ../../../cmd/structmorph/structmorph.go --from=partialfields.Person --to=partialfields.PersonDTO
+//go:generate go run ../../cmd/structmorph/structmorph.go --src=partialfields.Person --dst=partialfields.PersonDTO
 type PersonDTO struct {
 	Name string
 	Age  int

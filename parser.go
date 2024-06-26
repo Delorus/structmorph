@@ -71,23 +71,23 @@ func (p *Parser) FindStruct(name StructName, parser ParseStructTypeFunc) error {
 	return nil
 }
 
-func (p *Parser) FindAndParseStructTo(name StructName) (ToStructType, error) {
-	result := &ToStructType{StructName: name}
+func (p *Parser) FindAndParseStructDst(name StructName) (DstStructType, error) {
+	result := &DstStructType{StructName: name}
 	return *result, p.FindStruct(name, func(name StructName, pkg *packages.Package, spec *ast.TypeSpec) {
 		result.FilePath = filepath.Dir(pkg.Fset.Position(spec.Pos()).Filename)
 		result.extractFields(spec)
 	})
 }
 
-func (p *Parser) FindAndParseStructFrom(name StructName) (FromStructType, error) {
-	result := &FromStructType{StructName: name}
+func (p *Parser) FindAndParseStructSrc(name StructName) (SrcStructType, error) {
+	result := &SrcStructType{StructName: name}
 	return *result, p.FindStruct(name, func(name StructName, pkg *packages.Package, spec *ast.TypeSpec) {
 		result.ImportPath = pkg.Types.Path()
 		result.extractFields(spec)
 	})
 }
 
-func (t *FromStructType) extractFields(spec *ast.TypeSpec) {
+func (t *SrcStructType) extractFields(spec *ast.TypeSpec) {
 	list := spec.Type.(*ast.StructType).Fields.List
 	fields := make(map[string]string, len(list))
 	for _, field := range list {
@@ -104,9 +104,9 @@ func (t *FromStructType) extractFields(spec *ast.TypeSpec) {
 	t.Fields = fields
 }
 
-func (s *ToStructType) extractFields(t *ast.TypeSpec) {
+func (s *DstStructType) extractFields(t *ast.TypeSpec) {
 	list := t.Type.(*ast.StructType).Fields.List
-	fields := make([]ToFieldType, 0, len(list))
+	fields := make([]DstFieldType, 0, len(list))
 	for _, astField := range list {
 		fieldType := parseFieldType(astField.Type)
 
@@ -116,10 +116,10 @@ func (s *ToStructType) extractFields(t *ast.TypeSpec) {
 			fieldName = astField.Names[0].Name
 		}
 
-		field := ToFieldType{
-			Name:      fieldName,
-			Type:      fieldType,
-			FromField: fieldName,
+		field := DstFieldType{
+			Name:     fieldName,
+			Type:     fieldType,
+			SrcField: fieldName,
 		}
 
 		if astField.Tag != nil {
@@ -128,7 +128,7 @@ func (s *ToStructType) extractFields(t *ast.TypeSpec) {
 				tagValue := strings.Trim(tag, "`")
 				tagValue = strings.TrimPrefix(tagValue, "morph:\"")
 				tagValue = strings.TrimSuffix(tagValue, "\"")
-				field.FromField = tagValue
+				field.SrcField = tagValue
 			}
 		}
 

@@ -37,7 +37,7 @@ type CompositeType struct {
 	CompositeField string
 }
 
-//go:generate go run ../../../cmd/structmorph/structmorph.go --from=allsupportedtypes.Type --to=allsupportedtypes.TypeDTO
+//go:generate go run ../../cmd/structmorph/structmorph.go --src=allsupportedtypes.Type --dst=allsupportedtypes.TypeDTO
 type TypeDTO struct {
 	StringField  string
 	IntField     int

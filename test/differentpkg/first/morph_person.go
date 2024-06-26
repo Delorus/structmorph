@@ -2,7 +2,7 @@
 
 package first
 
-import "structmorph/test/testdata/differentpkg/second"
+import "structmorph/test/differentpkg/second"
 
 func ConvertToPersonDTO(src second.Person) PersonDTO {
 	return PersonDTO{

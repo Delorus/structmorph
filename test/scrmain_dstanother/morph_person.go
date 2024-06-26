@@ -2,7 +2,7 @@
 
 package main
 
-import "structmorph/test/testdata/scrmain_dstanother/another"
+import "structmorph/test/scrmain_dstanother/another"
 
 func ConvertToPersonDTO(src another.Person) PersonDTO {
 	return PersonDTO{

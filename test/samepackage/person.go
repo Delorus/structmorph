@@ -5,7 +5,7 @@ type Person struct {
 	Age  int
 }
 
-//go:generate go run ../../../cmd/structmorph/structmorph.go --from=samepackage.Person --to=samepackage.PersonDTO
+//go:generate go run ../../cmd/structmorph/structmorph.go --src=samepackage.Person --dst=samepackage.PersonDTO
 type PersonDTO struct {
 	Name string
 	Age  int

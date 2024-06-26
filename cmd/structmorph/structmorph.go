@@ -9,14 +9,14 @@ import (
 )
 
 var (
-	from = flag.String("from", "", "Source struct name")
-	to   = flag.String("to", "", "Destination struct name")
+	from = flag.String("src", "", "Source struct name")
+	to   = flag.String("dst", "", "Destination struct name")
 	root = flag.String("root", "", "Root directory")
 )
 
 func main() {
 	parseArgs()
-	slog.Info("Parsed arguments", "from", from, "to", to)
+	slog.Info("Parsed arguments", "src", from, "dst", to)
 
 	var opts []structmorph.GenerationConfigOption
 	if *root != "" {

@@ -37,7 +37,7 @@ func WithProjectRoot(root string) GenerationConfigOption {
 	}
 }
 
-func Generate(from, to string, opts ...GenerationConfigOption) error {
+func Generate(src, dst string, opts ...GenerationConfigOption) error {
 	cfg := DefaultGenerationConfig()
 	for _, opt := range opts {
 		opt(cfg)
@@ -45,28 +45,28 @@ func Generate(from, to string, opts ...GenerationConfigOption) error {
 
 	parser := cfg.NewParser()
 
-	fromStructName, err := ParseStructName(from)
+	srcStructName, err := ParseStructName(src)
 	if err != nil {
 		return err
 	}
-	toStructName, err := ParseStructName(to)
+	dstStructName, err := ParseStructName(dst)
 	if err != nil {
 		return err
 	}
 
-	fromStruct, err := parser.FindAndParseStructFrom(fromStructName)
+	srcStruct, err := parser.FindAndParseStructSrc(srcStructName)
 	if err != nil {
 		return err
 	}
-	slog.Info("Found and parsed struct", slog.Any("struct", fromStruct))
+	slog.Info("Found and parsed struct", slog.Any("struct", srcStruct))
 
-	toStruct, err := parser.FindAndParseStructTo(toStructName)
+	dstStruct, err := parser.FindAndParseStructDst(dstStructName)
 	if err != nil {
 		return err
 	}
-	slog.Info("Found and parsed struct", slog.Any("struct", toStruct))
+	slog.Info("Found and parsed struct", slog.Any("struct", dstStruct))
 
-	data, err := CreateTemplateData(fromStruct, toStruct)
+	data, err := CreateTemplateData(srcStruct, dstStruct)
 	if err != nil {
 		return fmt.Errorf("error creating template data: %w", err)
 	}
@@ -77,7 +77,7 @@ func Generate(from, to string, opts ...GenerationConfigOption) error {
 		return fmt.Errorf("error generating code: %w", err)
 	}
 
-	fileName := filepath.Join(toStruct.Filepath(), fromStruct.FileName())
+	fileName := filepath.Join(dstStruct.Filepath(), srcStruct.FileName())
 	err = FormatAndWrite(buff, fileName)
 	if err != nil {
 		return fmt.Errorf("error formatting and writing code: %w", err)
@@ -87,19 +87,19 @@ func Generate(from, to string, opts ...GenerationConfigOption) error {
 	return nil
 }
 
-func CreateTemplateData(fromStruct FromStructType, toStruct ToStructType) (TemplateData, error) {
+func CreateTemplateData(srcStruct SrcStructType, dstStruct DstStructType) (TemplateData, error) {
 	data := TemplateData{
-		FuncNameToDTO:    fmt.Sprintf("ConvertTo%s", toStruct.Name),
-		FuncNameToStruct: fmt.Sprintf("ConvertTo%s", fromStruct.Name),
-		FromStructName:   fromStruct.Name,
-		ToStructName:     toStruct.Name,
-		DistFilePkgName:  toStruct.Package,
+		FuncNameToDTO:    fmt.Sprintf("ConvertTo%s", dstStruct.Name),
+		FuncNameToStruct: fmt.Sprintf("ConvertTo%s", srcStruct.Name),
+		SrcStructName:    srcStruct.Name,
+		DstStructName:    dstStruct.Name,
+		DistFilePkgName:  dstStruct.Package,
 	}
 
-	data.FromStructName = resolveSrcStructName(fromStruct, toStruct)
-	data.FromPkgPathImport = resolveSrcStructImport(fromStruct, toStruct)
+	data.SrcStructName = resolveSrcStructName(srcStruct, dstStruct)
+	data.SrcPkgPathImport = resolveSrcStructImport(srcStruct, dstStruct)
 
-	fields, err := CreateMapping(fromStruct, toStruct)
+	fields, err := CreateMapping(srcStruct, dstStruct)
 	if err != nil {
 		return data, err
 	}
@@ -108,18 +108,18 @@ func CreateTemplateData(fromStruct FromStructType, toStruct ToStructType) (Templ
 	return data, nil
 }
 
-func resolveSrcStructName(fromStruct FromStructType, toStruct ToStructType) string {
-	if fromStruct.Package == toStruct.Package {
-		return fromStruct.Name
+func resolveSrcStructName(srcStruct SrcStructType, dstStruct DstStructType) string {
+	if srcStruct.Package == dstStruct.Package {
+		return srcStruct.Name
 	}
-	return fmt.Sprintf("%s.%s", fromStruct.Package, fromStruct.Name)
+	return fmt.Sprintf("%s.%s", srcStruct.Package, srcStruct.Name)
 }
 
-func resolveSrcStructImport(fromStruct FromStructType, toStruct ToStructType) string {
-	if fromStruct.Package == toStruct.Package {
+func resolveSrcStructImport(srcStruct SrcStructType, dstStruct DstStructType) string {
+	if srcStruct.Package == dstStruct.Package {
 		return ""
 	}
-	return fromStruct.ImportPath
+	return srcStruct.ImportPath
 }
 
 type StructName struct {
@@ -142,7 +142,7 @@ func ParseStructName(rawName string) (StructName, error) {
 	}
 
 	if len(parts) != 2 {
-		return StructName{}, fmt.Errorf("invalid format for --from or --to. Expected 'package.StructName'")
+		return StructName{}, fmt.Errorf("invalid format for struct name. Expected 'package.StructName'")
 	}
 	return StructName{
 		Package: parts[0],
@@ -150,44 +150,44 @@ func ParseStructName(rawName string) (StructName, error) {
 	}, nil
 }
 
-type ToStructType struct {
+type DstStructType struct {
 	StructName
-	Fields   []ToFieldType
+	Fields   []DstFieldType
 	FilePath string
 }
 
-func (s *ToStructType) Filepath() string {
+func (s *DstStructType) Filepath() string {
 	return s.FilePath
 }
 
-type FromStructType struct {
+type SrcStructType struct {
 	StructName
 	ImportPath string
 	Fields     map[string]string
 }
 
-type ToFieldType struct {
-	Name      string
-	Type      string
-	FromField string
+type DstFieldType struct {
+	Name     string
+	Type     string
+	SrcField string
 }
 
 type FieldMapping struct {
-	FromField string
-	ToField   ToFieldType
+	SrcField string
+	DstField DstFieldType
 }
 
-func CreateMapping(fromStruct FromStructType, toStruct ToStructType) ([]FieldMapping, error) {
+func CreateMapping(srcStruct SrcStructType, dstStruct DstStructType) ([]FieldMapping, error) {
 	var fields []FieldMapping
-	for _, toField := range toStruct.Fields {
-		fromField := toField.FromField
-		fromFieldType, ok := fromStruct.Fields[fromField]
-		if !ok || fromFieldType != toField.Type {
-			return nil, fmt.Errorf("field not found or type mismatch, field: %s, type: %+v, struct: %s", fromField, toField, fromStruct.Name)
+	for _, dstField := range dstStruct.Fields {
+		srcField := dstField.SrcField
+		srcFieldType, ok := srcStruct.Fields[srcField]
+		if !ok || srcFieldType != dstField.Type {
+			return nil, fmt.Errorf("field not found or type mismatch, field: %s, type: %+v, struct: %s", srcField, dstField, srcStruct.Name)
 		}
 		fields = append(fields, FieldMapping{
-			FromField: fromField,
-			ToField:   toField,
+			SrcField: srcField,
+			DstField: dstField,
 		})
 	}
 
@@ -213,31 +213,31 @@ func FormatAndWrite(buff *bytes.Buffer, fileName string) error {
 }
 
 type TemplateData struct {
-	FuncNameToDTO     string
-	FuncNameToStruct  string
-	FromPkgPathImport string
-	FromStructName    string
-	DistFilePkgName   string
-	ToStructName      string
-	Fields            []FieldMapping
+	FuncNameToDTO    string
+	FuncNameToStruct string
+	SrcPkgPathImport string
+	SrcStructName    string
+	DistFilePkgName  string
+	DstStructName    string
+	Fields           []FieldMapping
 }
 
 const tmpl = `// Code generated by structmorph; DO NOT EDIT.
 
 package {{.DistFilePkgName}}
 
-{{if ne .FromPkgPathImport ""}}import "{{.FromPkgPathImport}}"{{end}}
+{{if ne .SrcPkgPathImport ""}}import "{{.SrcPkgPathImport}}"{{end}}
 
-func {{.FuncNameToDTO}}(src {{.FromStructName}}) {{.ToStructName}} {
-	return {{.ToStructName}}{
-		{{range .Fields}}{{.ToField.Name}}: src.{{.FromField}},
+func {{.FuncNameToDTO}}(src {{.SrcStructName}}) {{.DstStructName}} {
+	return {{.DstStructName}}{
+		{{range .Fields}}{{.DstField.Name}}: src.{{.SrcField}},
 		{{end}}
 	}
 }
 
-func {{.FuncNameToStruct}}(src {{.ToStructName}}) {{.FromStructName}} {
-	return {{.FromStructName}}{
-		{{range .Fields}}{{.FromField}}: src.{{.ToField.Name}},
+func {{.FuncNameToStruct}}(src {{.DstStructName}}) {{.SrcStructName}} {
+	return {{.SrcStructName}}{
+		{{range .Fields}}{{.SrcField}}: src.{{.DstField.Name}},
 		{{end}}
 	}
 }
@@ -253,6 +253,6 @@ func (data TemplateData) GenerateCode(output io.Writer) error {
 	return nil
 }
 
-func (t FromStructType) FileName() string {
+func (t SrcStructType) FileName() string {
 	return fmt.Sprintf("morph_%s.go", strings.ToLower(t.Name))
 }

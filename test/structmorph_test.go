@@ -2,9 +2,9 @@ package structmorph__test
 
 import (
 	"structmorph"
-	"structmorph/test/testdata/allsupportedtypes"
-	"structmorph/test/testdata/customfieldname"
-	"structmorph/test/testdata/partialfields"
+	"structmorph/test/allsupportedtypes"
+	"structmorph/test/customfieldname"
+	"structmorph/test/partialfields"
 	"testing"
 
 	"github.com/go-faker/faker/v4"
@@ -14,9 +14,9 @@ import (
 )
 
 func TestGenerateManual(t *testing.T) {
-	//t.Skip("Skip manual test")
+	t.Skip("Skip manual test")
 	// you can generate in manual mode for debug purposes
-	err := structmorph.Generate("allsupportedtypes.Type", "allsupportedtypes.TypeDTO", structmorph.WithProjectRoot("testdata/allsupportedtypes"))
+	err := structmorph.Generate("allsupportedtypes.Type", "allsupportedtypes.TypeDTO", structmorph.WithProjectRoot("allsupportedtypes"))
 	if err != nil {
 		t.Fatal(err)
 	}

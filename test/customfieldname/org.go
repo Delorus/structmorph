@@ -7,7 +7,7 @@ type Organization struct {
 	EmployeesCount int
 }
 
-//go:generate go run ../../../cmd/structmorph/structmorph.go --from=customfieldname.Organization --to=customfieldname.OrganizationDTO
+//go:generate go run ../../cmd/structmorph/structmorph.go --src=customfieldname.Organization --dst=customfieldname.OrganizationDTO
 type OrganizationDTO struct {
 	Title       string
 	Description string
