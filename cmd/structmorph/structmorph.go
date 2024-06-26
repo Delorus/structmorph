@@ -1,47 +1,38 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"log/slog"
 	"os"
-	"strings"
 	"structmorph"
 )
 
-func main() {
-	args := parseArgs()
-	slog.Info("Parsed arguments", "from", args.from, "to", args.to)
+var (
+	from = flag.String("from", "", "Source struct name")
+	to   = flag.String("to", "", "Destination struct name")
+	root = flag.String("root", "", "Root directory")
+)
 
-	if err := structmorph.Generate(args.from, args.to); err != nil {
+func main() {
+	parseArgs()
+	slog.Info("Parsed arguments", "from", from, "to", to)
+
+	var opts []structmorph.GenerationConfigOption
+	if *root != "" {
+		opts = append(opts, structmorph.WithProjectRoot(*root))
+	}
+
+	if err := structmorph.Generate(*from, *to, opts...); err != nil {
 		log.Fatalf("Error generating code: %v", err)
 	}
 }
 
-type Args struct {
-	from string
-	to   string
-}
+func parseArgs() {
+	flag.Parse()
 
-func parseArgs() Args {
-	if len(os.Args) < 2 {
+	if *from == "" || *to == "" {
 		slog.Error("Usage: structmorph --from=domain.Person --to=main.PersonDTO")
 		os.Exit(1)
 	}
-
-	var args Args
-	for _, arg := range os.Args[1:] {
-		switch {
-		case strings.HasPrefix(arg, "--from="):
-			args.from = arg[len("--from="):]
-		case strings.HasPrefix(arg, "--to="):
-			args.to = arg[len("--to="):]
-		}
-	}
-
-	if args.from == "" || args.to == "" {
-		slog.Error("Usage: structmorph --from=domain.Person --to=main.PersonDTO")
-		os.Exit(1)
-	}
-
-	return args
 }

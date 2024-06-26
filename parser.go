@@ -3,30 +3,48 @@ package structmorph
 import (
 	"fmt"
 	"go/ast"
+	"log"
 	"log/slog"
+	"path/filepath"
 	"strings"
+	"sync"
 
 	"golang.org/x/tools/go/packages"
 )
 
 type Parser struct {
 	ProjectRoot string
+
+	pkgCache struct {
+		once       sync.Once
+		pkgs       []*packages.Package
+		loadPkgErr error
+	}
 }
 
 type ParseStructTypeFunc func(name StructName, pkg *packages.Package, spec *ast.TypeSpec)
 
 func (p *Parser) FindStruct(name StructName, parser ParseStructTypeFunc) error {
 	cfg := &packages.Config{
+		Dir:  p.ProjectRoot,
+		Logf: log.Printf, //todo
 		//todo убрать потом то что не нужно
 		Mode: packages.NeedFiles | packages.NeedSyntax | packages.NeedTypes | packages.NeedCompiledGoFiles | packages.NeedDeps | packages.NeedImports,
 	}
-	pkgs, err := packages.Load(cfg, p.ProjectRoot+"/...")
-	if err != nil {
-		return fmt.Errorf("error loading packages: %w", err)
+
+	p.pkgCache.once.Do(func() {
+		pkgs, err := packages.Load(cfg, "./...")
+		if err != nil {
+			p.pkgCache.loadPkgErr = fmt.Errorf("error loading packages: %w", err)
+		}
+		p.pkgCache.pkgs = pkgs
+	})
+	if p.pkgCache.loadPkgErr != nil {
+		return p.pkgCache.loadPkgErr
 	}
 
 	var found bool
-	for _, pkg := range pkgs {
+	for _, pkg := range p.pkgCache.pkgs {
 		for _, file := range pkg.Syntax {
 			ast.Inspect(file, func(n ast.Node) bool {
 				switch node := n.(type) {
@@ -36,7 +54,7 @@ func (p *Parser) FindStruct(name StructName, parser ParseStructTypeFunc) error {
 							filePath := pkg.Fset.Position(file.Pos()).Filename
 							parser(name, pkg, t)
 							found = true
-							slog.Info("Struct found in file", "struct", name, "file", filePath, "importPath", pkg.PkgPath)
+							slog.Info("Struct found in file", "struct", name, "file", filePath, "importPath", pkg.Types.Path())
 							return false
 						}
 					}
@@ -56,6 +74,7 @@ func (p *Parser) FindStruct(name StructName, parser ParseStructTypeFunc) error {
 func (p *Parser) FindAndParseStructTo(name StructName) (ToStructType, error) {
 	result := &ToStructType{StructName: name}
 	return *result, p.FindStruct(name, func(name StructName, pkg *packages.Package, spec *ast.TypeSpec) {
+		result.FilePath = filepath.Dir(pkg.Fset.Position(spec.Pos()).Filename)
 		result.extractFields(spec)
 	})
 }
@@ -63,7 +82,7 @@ func (p *Parser) FindAndParseStructTo(name StructName) (ToStructType, error) {
 func (p *Parser) FindAndParseStructFrom(name StructName) (FromStructType, error) {
 	result := &FromStructType{StructName: name}
 	return *result, p.FindStruct(name, func(name StructName, pkg *packages.Package, spec *ast.TypeSpec) {
-		result.ImportPath = pkg.PkgPath
+		result.ImportPath = pkg.Types.Path()
 		result.extractFields(spec)
 	})
 }
