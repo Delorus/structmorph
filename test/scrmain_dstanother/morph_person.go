@@ -5,6 +5,7 @@ package main
 import "structmorph/test/scrmain_dstanother/another"
 
 func ConvertToPersonDTO(src another.Person) PersonDTO {
+
 	return PersonDTO{
 		Name: src.Name,
 		Age:  src.Age,
@@ -12,6 +13,7 @@ func ConvertToPersonDTO(src another.Person) PersonDTO {
 }
 
 func ConvertToPerson(src PersonDTO) another.Person {
+
 	return another.Person{
 		Name: src.Name,
 		Age:  src.Age,

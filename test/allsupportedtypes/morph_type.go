@@ -3,6 +3,7 @@
 package allsupportedtypes
 
 func ConvertToTypeDTO(src Type) TypeDTO {
+
 	return TypeDTO{
 		StringField:    src.StringField,
 		IntField:       src.IntField,
@@ -32,6 +33,7 @@ func ConvertToTypeDTO(src Type) TypeDTO {
 }
 
 func ConvertToType(src TypeDTO) Type {
+
 	return Type{
 		StringField:    src.StringField,
 		IntField:       src.IntField,

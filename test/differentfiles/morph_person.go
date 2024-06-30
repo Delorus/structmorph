@@ -3,6 +3,7 @@
 package differentfiles
 
 func ConvertToPersonDTO(src Person) PersonDTO {
+
 	return PersonDTO{
 		Name: src.Name,
 		Age:  src.Age,
@@ -10,6 +11,7 @@ func ConvertToPersonDTO(src Person) PersonDTO {
 }
 
 func ConvertToPerson(src PersonDTO) Person {
+
 	return Person{
 		Name: src.Name,
 		Age:  src.Age,

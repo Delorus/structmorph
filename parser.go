@@ -89,17 +89,22 @@ func (p *Parser) FindAndParseStructSrc(name StructName) (SrcStructType, error) {
 
 func (t *SrcStructType) extractFields(spec *ast.TypeSpec) {
 	list := spec.Type.(*ast.StructType).Fields.List
-	fields := make(map[string]string, len(list))
+	fields := make(map[string]SrcFieldType, len(list))
 	for _, field := range list {
 		fieldType := parseFieldType(field.Type)
 
-		fieldName := fieldType
+		fieldName := fieldType.Name
 		// handle anonymous struct fields
 		if len(field.Names) > 0 {
 			fieldName = field.Names[0].Name
 		}
 
-		fields[fieldName] = fieldType
+		fields[fieldName] = SrcFieldType{
+			FieldType{
+				Name: fieldName,
+				Type: fieldType,
+			},
+		}
 	}
 	t.Fields = fields
 }
@@ -110,15 +115,17 @@ func (s *DstStructType) extractFields(t *ast.TypeSpec) {
 	for _, astField := range list {
 		fieldType := parseFieldType(astField.Type)
 
-		fieldName := fieldType
+		fieldName := fieldType.Name
 		// handle anonymous struct fields
 		if len(astField.Names) > 0 {
 			fieldName = astField.Names[0].Name
 		}
 
 		field := DstFieldType{
-			Name:     fieldName,
-			Type:     fieldType,
+			FieldType: FieldType{
+				Name: fieldName,
+				Type: fieldType,
+			},
 			SrcField: fieldName,
 		}
 
@@ -141,19 +148,19 @@ func (s *DstStructType) extractFields(t *ast.TypeSpec) {
 	s.Fields = fields
 }
 
-func parseFieldType(field ast.Expr) string {
+func parseFieldType(field ast.Expr) FieldTypeType {
 	switch t := field.(type) {
 	case *ast.Ident:
-		return t.Name
+		return FieldTypeType{Name: t.Name}
 	case *ast.ArrayType:
-		return fmt.Sprintf("[]%s", parseFieldType(t.Elt)) //todo limit
+		return FieldTypeType{Name: fmt.Sprintf("[]%s", parseFieldType(t.Elt).Name)} //todo limit recursion
 	case *ast.MapType:
-		return fmt.Sprintf("map[%s]%s", parseFieldType(t.Key), parseFieldType(t.Value))
+		return FieldTypeType{Name: fmt.Sprintf("map[%s]%s", parseFieldType(t.Key).Name, parseFieldType(t.Value).Name)}
 	case *ast.StarExpr:
-		return fmt.Sprintf("*%s", parseFieldType(t.X))
+		return FieldTypeType{Name: parseFieldType(t.X).Name, IsPointer: true} //todo test how it would works with two pointers
 	//case *ast.SelectorExpr:
 	//	return fmt.Sprintf("%s.%s", t.X, t.Sel)
 	default:
-		return fmt.Sprintf("%T", t)
+		return FieldTypeType{Name: fmt.Sprintf("%T", t)}
 	}
 }

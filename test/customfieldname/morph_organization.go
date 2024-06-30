@@ -3,6 +3,7 @@
 package customfieldname
 
 func ConvertToOrganizationDTO(src Organization) OrganizationDTO {
+
 	return OrganizationDTO{
 		Title:       src.Title,
 		Description: src.Description,
@@ -12,6 +13,7 @@ func ConvertToOrganizationDTO(src Organization) OrganizationDTO {
 }
 
 func ConvertToOrganization(src OrganizationDTO) Organization {
+
 	return Organization{
 		Title:          src.Title,
 		Description:    src.Description,

@@ -3,6 +3,7 @@
 package main
 
 func ConvertToPersonDTO(src Person) PersonDTO {
+
 	return PersonDTO{
 		Name: src.Name,
 		Sex:  src.Sex,
@@ -10,6 +11,7 @@ func ConvertToPersonDTO(src Person) PersonDTO {
 }
 
 func ConvertToPerson(src PersonDTO) Person {
+
 	return Person{
 		Name: src.Name,
 		Sex:  src.Sex,

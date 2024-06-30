@@ -5,6 +5,7 @@ package first
 import "structmorph/test/differentpkg/second"
 
 func ConvertToPersonDTO(src second.Person) PersonDTO {
+
 	return PersonDTO{
 		Name: src.Name,
 		Age:  src.Age,
@@ -12,6 +13,7 @@ func ConvertToPersonDTO(src second.Person) PersonDTO {
 }
 
 func ConvertToPerson(src PersonDTO) second.Person {
+
 	return second.Person{
 		Name: src.Name,
 		Age:  src.Age,
